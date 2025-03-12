@@ -95,5 +95,8 @@ def generar_menu():
 
     return jsonify({"menu": menu, "calorias_totales": calorias_objetivo})
 
+import os
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))  # Render asigna un puerto automáticamente
+    app.run(host="0.0.0.0", port=port, debug=True)
