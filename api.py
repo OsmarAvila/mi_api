@@ -1,4 +1,3 @@
- 
 from flask import Flask, request, jsonify
 import random
 
@@ -50,15 +49,6 @@ def generar_menu():
     comidas_por_dia = datos.get("comidas_por_dia", 3)
     alergias = datos.get("alergias", [])
     horarios = datos.get("horarios", [])
-
-    return jsonify({
-        "mensaje": "Menú generado correctamente",
-        "peso": peso,
-        "calorias": calorias_objetivo,
-        "comidas_por_dia": comidas_por_dia,
-        "alergias": alergias,
-        "horarios": horarios
-    })
 
     proteina_objetivo = 3 * peso
     grasa_objetivo = 1 * peso
