@@ -1,92 +1,100 @@
 from flask import Flask, request, jsonify
-import random
+from waitress import serve
 
 app = Flask(__name__)
 
-# 📌 Base de datos de alimentos con valores nutricionales (por 100g)
+# Base de datos de alimentos completa
 alimentos = {
-    "proteínas": {
-        "Pollo": {"calorias": 120, "grasa": 2.6, "carbohidratos": 0, "proteina": 22.5},
-        "Carne magra": {"calorias": 135, "grasa": 4.62, "carbohidratos": 0, "proteina": 23},
-        "Atún enlatado al agua": {"calorias": 100, "grasa": 0, "carbohidratos": 0, "proteina": 25},
-        "Salmón": {"calorias": 185, "grasa": 12, "carbohidratos": 1, "proteina": 18.4},
-        "Claras de huevo": {"calorias": 50, "grasa": 0.5, "carbohidratos": 1, "proteina": 10},
-        "Huevo entero": {"calorias": 66, "grasa": 3.75, "carbohidratos": 1, "proteina": 6.5},
-        "Tofu": {"calorias": 110, "grasa": 6.9, "carbohidratos": 1, "proteina": 11},
-        "Seitán": {"calorias": 124, "grasa": 1.8, "carbohidratos": 2.9, "proteina": 24.1}
-    },
-    "carbohidratos": {
-        "Avena": {"calorias": 389, "grasa": 7, "carbohidratos": 67, "proteina": 14},
-        "Arroz integral": {"calorias": 360, "grasa": 1, "carbohidratos": 77, "proteina": 7},
-        "Batata": {"calorias": 86, "grasa": 0.1, "carbohidratos": 20, "proteina": 2},
-        "Papa": {"calorias": 77, "grasa": 0, "carbohidratos": 17.47, "proteina": 2}
-    },
-    "grasas": {
-        "Palta": {"calorias": 160, "grasa": 15, "carbohidratos": 8, "proteina": 2},
-        "Aceite de oliva": {"calorias": 900, "grasa": 100, "carbohidratos": 0, "proteina": 0},
-        "Almendras": {"calorias": 575, "grasa": 49, "carbohidratos": 22, "proteina": 21},
-        "Nueces": {"calorias": 654, "grasa": 65, "carbohidratos": 14, "proteina": 15},
-        "Mantequilla de maní": {"calorias": 573, "grasa": 50, "carbohidratos": 20, "proteina": 25}
-    },
-    "verduras": {
-        "Espinaca": {"calorias": 23, "grasa": 0.4, "carbohidratos": 4, "proteina": 3},
-        "Brócoli": {"calorias": 34, "grasa": 0.4, "carbohidratos": 7, "proteina": 3},
-        "Zanahoria": {"calorias": 41, "grasa": 0.1, "carbohidratos": 10, "proteina": 1},
-        "Tomate": {"calorias": 18, "grasa": 0.2, "carbohidratos": 3.9, "proteina": 0.9},
-        "Pepino": {"calorias": 16, "grasa": 0.1, "carbohidratos": 3.6, "proteina": 0.7},
-        "Pimientos": {"calorias": 40, "grasa": 0.3, "carbohidratos": 9, "proteina": 2}
-    }
+    "proteinas": [
+        {"nombre": "Pollo", "calorias": 120, "grasa": 2.6, "carbohidratos": 0, "proteina": 22.5},
+        {"nombre": "Carne magra", "calorias": 135, "grasa": 4.62, "carbohidratos": 0, "proteina": 23},
+        {"nombre": "Atún enlatado al agua", "calorias": 100, "grasa": 0, "carbohidratos": 0, "proteina": 25},
+        {"nombre": "Salmón", "calorias": 185, "grasa": 12, "carbohidratos": 1, "proteina": 18.4},
+        {"nombre": "Huevo entero", "calorias": 66, "grasa": 3.75, "carbohidratos": 1, "proteina": 6.5},
+        {"nombre": "Tofu", "calorias": 110, "grasa": 6.9, "carbohidratos": 1, "proteina": 11}
+    ],
+    "carbohidratos": [
+        {"nombre": "Avena", "calorias": 389, "grasa": 7, "carbohidratos": 67, "proteina": 14},
+        {"nombre": "Arroz integral", "calorias": 360, "grasa": 1, "carbohidratos": 77, "proteina": 7},
+        {"nombre": "Papa", "calorias": 77, "grasa": 0, "carbohidratos": 17.47, "proteina": 2},
+        {"nombre": "Batata", "calorias": 86, "grasa": 0.1, "carbohidratos": 20, "proteina": 2}
+    ],
+    "grasas": [
+        {"nombre": "Palta", "calorias": 160, "grasa": 15, "carbohidratos": 8, "proteina": 2},
+        {"nombre": "Aceite de oliva", "calorias": 900, "grasa": 100, "carbohidratos": 0, "proteina": 0},
+        {"nombre": "Almendras", "calorias": 575, "grasa": 49, "carbohidratos": 22, "proteina": 21}
+    ]
+}
+
+# Factores de actividad física
+factores_actividad = {
+    "sedentario": 1.2,
+    "poco activo": 1.375,
+    "moderado": 1.55,
+    "activo": 1.725,
+    "muy activo": 1.9
 }
 
 @app.route("/generar_menu", methods=["POST"])
 def generar_menu():
     datos = request.json
-    if not datos:
-        return jsonify({"error": "No se enviaron datos"}), 400
-    
-    peso = datos.get("peso", 70)
-    calorias_objetivo = datos.get("calorias", 2500)
-    comidas_por_dia = datos.get("comidas_por_dia", 3)
-    alergias = datos.get("alergias", [])
-    horarios = datos.get("horarios", [])
+    peso = datos.get("peso")
+    altura = datos.get("altura")
+    edad = datos.get("edad")
+    genero = datos.get("genero")
+    actividad = datos.get("actividad")
+    objetivo = datos.get("objetivo")
+    comidas_por_dia = datos.get("comidas_por_dia")
 
-    proteina_objetivo = 3 * peso
-    grasa_objetivo = 1 * peso
-    carbohidratos_objetivo = (calorias_objetivo - (proteina_objetivo * 4) - (grasa_objetivo * 9)) // 4
+    if None in [peso, altura, edad, genero, actividad, objetivo, comidas_por_dia]:
+        return jsonify({"error": "Faltan datos necesarios"}), 400
 
-    menu = {}
-    for i in range(comidas_por_dia):
-        comida = f"Comida {i+1} - {horarios[i] if i < len(horarios) else 'Sin horario definido'}"
-        menu[comida] = {}
+    # Calcular TMB
+    if genero.lower() == "hombre":
+        tmb = (10 * peso) + (6.25 * altura) - (5 * edad) + 5
+    else:
+        tmb = (10 * peso) + (6.25 * altura) - (5 * edad) - 161
 
-        for tipo in ["proteínas", "carbohidratos", "grasas", "verduras"]:
-            opciones = [a for a in alimentos[tipo] if a not in alergias]
-            if opciones:
-                alimento_elegido = random.choice(opciones)
-                valores = alimentos[tipo][alimento_elegido]
+    # Calcular GET
+    get = tmb * factores_actividad.get(actividad, 1.55)
 
-                if tipo == "proteínas":
-                    cantidad = (proteina_objetivo // comidas_por_dia) / valores["proteina"] * 100
-                elif tipo == "carbohidratos":
-                    cantidad = (carbohidratos_objetivo // comidas_por_dia) / valores["carbohidratos"] * 100
-                elif tipo == "grasas":
-                    cantidad = (grasa_objetivo // comidas_por_dia) / valores["grasa"] * 100
-                else:  # Verduras, se asigna un valor estándar de 100g
-                    cantidad = 100  
+    # Ajustar calorías según objetivo
+    if objetivo == "perder grasa":
+        calorias_diarias = get - 500
+    elif objetivo == "ganar músculo":
+        calorias_diarias = get + 300
+    else:
+        calorias_diarias = get
 
-                menu[comida][tipo.capitalize()] = {
-                    "Alimento": alimento_elegido,
-                    "Cantidad (g)": round(cantidad, 1),
-                    "Calorías": round(valores["calorias"] * (cantidad / 100), 1),
-                    "Proteína (g)": round(valores["proteina"] * (cantidad / 100), 1),
-                    "Carbohidratos (g)": round(valores["carbohidratos"] * (cantidad / 100), 1),
-                    "Grasas (g)": round(valores["grasa"] * (cantidad / 100), 1)
-                }
+    # Distribución de macronutrientes
+    proteinas_total = peso * 3  # 3g/kg
+    grasas_total = peso * 1  # 1g/kg
+    calorias_proteinas = proteinas_total * 4
+    calorias_grasas = grasas_total * 9
+    calorias_carbohidratos = calorias_diarias - (calorias_proteinas + calorias_grasas)
+    carbohidratos_total = calorias_carbohidratos / 4
 
-    return jsonify({"menu": menu, "calorias_totales": calorias_objetivo})
+    # Crear menú básico
+    menu = {
+        "desayuno": [alimentos["proteinas"][0], alimentos["carbohidratos"][0], alimentos["grasas"][0]],
+        "almuerzo": [alimentos["proteinas"][1], alimentos["carbohidratos"][1], alimentos["grasas"][1]],
+        "cena": [alimentos["proteinas"][2], alimentos["carbohidratos"][2], alimentos["grasas"][2]],
+    }
+    if comidas_por_dia == 4:
+        menu["merienda"] = [alimentos["proteinas"][3], alimentos["carbohidratos"][3], alimentos["grasas"][0]]
+    elif comidas_por_dia == 5:
+        menu["merienda"] = [alimentos["proteinas"][3], alimentos["carbohidratos"][3], alimentos["grasas"][0]]
+        menu["colación"] = [alimentos["proteinas"][4], alimentos["carbohidratos"][2], alimentos["grasas"][1]]
 
-import os
+    return jsonify({
+        "calorias_diarias": calorias_diarias,
+        "macronutrientes": {
+            "proteina": proteinas_total,
+            "grasas": grasas_total,
+            "carbohidratos": carbohidratos_total
+        },
+        "menu": menu
+    })
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # Render asigna un puerto automáticamente
-    app.run(host="0.0.0.0", port=port, debug=True)
+    serve(app, host="0.0.0.0", port=5000)
