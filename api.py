@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import random
 
 app = Flask(__name__)
 
@@ -35,77 +34,8 @@ factores_actividad = {
     "muy activo": 1.9
 }
 
-def calcular_porciones(macro_total, alimento, tipo):
-    """Calcula las porciones necesarias para cada alimento según el tipo (proteína, carbohidrato, grasa)."""
-    if tipo == "proteina":
-        return round((macro_total / alimento["proteina"]) * 100, 2)
-    elif tipo == "carbohidrato":
-        return round((macro_total / alimento["carbohidratos"]) * 100, 2)
-    elif tipo == "grasa":
-        return round((macro_total / alimento["grasa"]) * 100, 2)
-    return 100
-
-def generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total):
-    """Genera un menú balanceado distribuyendo los macronutrientes entre las comidas."""
-    calorias_por_comida = calorias_diarias / comidas_por_dia
-    menu = {}
-
-    # Fuentes de proteínas, carbohidratos y grasas
-    fuentes_proteina = alimentos["proteinas"]
-    fuentes_carbohidratos = alimentos["carbohidratos"]
-    fuentes_grasas = alimentos["grasas"]
-
-    # Distribuir los macronutrientes entre las comidas
-    for i in range(comidas_por_dia):
-        # Seleccionar un alimento de cada tipo (proteína, carbohidrato, grasa)
-        proteina = random.choice(fuentes_proteina)
-        carbohidrato = random.choice(fuentes_carbohidratos)
-        grasa = random.choice(fuentes_grasas)
-
-        # Calcular las porciones para cada tipo de alimento
-        porcion_proteina = calcular_porciones(proteina_total / comidas_por_dia, proteina, "proteina")
-        porcion_carbohidrato = calcular_porciones(carbohidratos_total / comidas_por_dia, carbohidrato, "carbohidrato")
-        porcion_grasa = calcular_porciones(grasas_total / comidas_por_dia, grasa, "grasa")
-
-        # Generar cada comida con la fuente de proteína, carbohidrato y grasa seleccionada
-        menu[f"Comida {i+1}"] = {
-            "proteina": {
-                "nombre": proteina["nombre"],
-                "cantidad": f"{porcion_proteina}g"
-            },
-            "carbohidrato": {
-                "nombre": carbohidrato["nombre"],
-                "cantidad": f"{porcion_carbohidrato}g"
-            },
-            "grasa": {
-                "nombre": grasa["nombre"],
-                "cantidad": f"{porcion_grasa}g"
-            }
-        }
-
-    return menu
-
-# Ruta principal
-@app.route("/", methods=["GET"])
-def home():
-    """Verificar que el servidor está funcionando."""
-    return "¡El servidor está funcionando!"
-
-# Ruta para generar el menú personalizado
-@app.route("/generar_menu", methods=["POST"])
-def generar_menu():
-    """Recibe los datos del usuario y genera el menú personalizado."""
-    datos = request.json
-    try:
-        peso = datos["peso"]
-        altura = datos["altura"]
-        edad = datos["edad"]
-        genero = datos["genero"]
-        actividad = datos["actividad"]
-        objetivo = datos["objetivo"]
-        comidas_por_dia = datos["comidas_por_dia"]
-    except KeyError:
-        return jsonify({"error": "Faltan datos necesarios"}), 400
+def calcular_gasto_calorico(peso, altura, edad, genero, actividad, objetivo):
+    """Calcular el gasto calórico y los macronutrientes."""
 
     # Calcular TMB (Metabolismo Basal)
     if genero.lower() == "hombre":
@@ -132,14 +62,39 @@ def generar_menu():
     calorias_carbohidratos = calorias_diarias - (calorias_proteinas + calorias_grasas)  # Calorías restantes para carbohidratos
     carbohidratos_total = calorias_carbohidratos / 4  # Convertir calorías en gramos de carbohidratos
 
-    # Generar menú con las porciones exactas
-    menu_personalizado = generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total)
+    return calorias_diarias, proteina_total, carbohidratos_total, grasas_total
 
-    # Responder con el menú generado
+@app.route("/", methods=["GET"])
+def home():
+    """Verificar que el servidor está funcionando."""
+    return "¡El servidor está funcionando!"
+
+# Ruta para obtener los datos y generar el cálculo
+@app.route("/calcular", methods=["POST"])
+def calcular():
+    """Recibe los datos del usuario y genera los cálculos del gasto calórico."""
+    datos = request.json
+    try:
+        peso = datos["peso"]
+        altura = datos["altura"]
+        edad = datos["edad"]
+        genero = datos["genero"]
+        actividad = datos["actividad"]
+        objetivo = datos["objetivo"]
+    except KeyError:
+        return jsonify({"error": "Faltan datos necesarios"}), 400
+
+    # Calcular el gasto calórico y los macronutrientes
+    calorias_diarias, proteina_total, carbohidratos_total, grasas_total = calcular_gasto_calorico(
+        peso, altura, edad, genero, actividad, objetivo
+    )
+
     return jsonify({
-        "mensaje": "Menú generado exitosamente",
-        "menu": menu_personalizado,
-        "nota": "Todas las cantidades de alimentos están basadas en valores por cada 100 gramos."
+        "calorias_diarias": calorias_diarias,
+        "proteina_total": proteina_total,
+        "carbohidratos_total": carbohidratos_total,
+        "grasas_total": grasas_total,
+        "alimentos_disponibles": alimentos
     })
 
 if __name__ == "__main__":
