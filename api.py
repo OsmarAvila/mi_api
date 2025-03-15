@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
-from waitress import serve
+import random
 
 app = Flask(__name__)
 
-# Base de datos de alimentos completa
+# Base de datos de alimentos completa (valores por cada 100g)
 alimentos = {
     "proteinas": [
         {"nombre": "Pollo", "calorias": 120, "grasa": 2.6, "carbohidratos": 0, "proteina": 22.5},
@@ -35,18 +35,48 @@ factores_actividad = {
     "muy activo": 1.9
 }
 
+def calcular_porciones(macro_total, alimento, tipo):
+    if tipo == "proteina":
+        return round((macro_total / alimento["proteina"]) * 100, 2)
+    elif tipo == "carbohidrato":
+        return round((macro_total / alimento["carbohidratos"]) * 100, 2)
+    elif tipo == "grasa":
+        return round((macro_total / alimento["grasa"]) * 100, 2)
+    return 100
+
+def generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total):
+    calorias_por_comida = calorias_diarias / comidas_por_dia
+    menu = {}
+    
+    for i in range(comidas_por_dia):
+        proteina = random.choice(alimentos["proteinas"])
+        carbohidrato = random.choice(alimentos["carbohidratos"])
+        grasa = random.choice(alimentos["grasas"])
+        
+        porcion_proteina = calcular_porciones(proteina_total / comidas_por_dia, proteina, "proteina")
+        porcion_carbohidrato = calcular_porciones(carbohidratos_total / comidas_por_dia, carbohidrato, "carbohidrato")
+        porcion_grasa = calcular_porciones(grasas_total / comidas_por_dia, grasa, "grasa")
+        
+        menu[f"Comida {i+1}"] = {
+            "proteina": {"nombre": proteina["nombre"], "cantidad": f"{porcion_proteina}g"},
+            "carbohidrato": {"nombre": carbohidrato["nombre"], "cantidad": f"{porcion_carbohidrato}g"},
+            "grasa": {"nombre": grasa["nombre"], "cantidad": f"{porcion_grasa}g"},
+        }
+    
+    return menu
+
 @app.route("/generar_menu", methods=["POST"])
 def generar_menu():
     datos = request.json
-    peso = datos.get("peso")
-    altura = datos.get("altura")
-    edad = datos.get("edad")
-    genero = datos.get("genero")
-    actividad = datos.get("actividad")
-    objetivo = datos.get("objetivo")
-    comidas_por_dia = datos.get("comidas_por_dia")
-
-    if None in [peso, altura, edad, genero, actividad, objetivo, comidas_por_dia]:
+    try:
+        peso = datos["peso"]
+        altura = datos["altura"]
+        edad = datos["edad"]
+        genero = datos["genero"]
+        actividad = datos["actividad"]
+        objetivo = datos["objetivo"]
+        comidas_por_dia = datos["comidas_por_dia"]
+    except KeyError:
         return jsonify({"error": "Faltan datos necesarios"}), 400
 
     # Calcular TMB
@@ -66,35 +96,22 @@ def generar_menu():
     else:
         calorias_diarias = get
 
-    # Distribución de macronutrientes
-    proteinas_total = peso * 3  # 3g/kg
+    # Cálculo de macronutrientes
+    proteina_total = peso * 3  # 3g/kg
     grasas_total = peso * 1  # 1g/kg
-    calorias_proteinas = proteinas_total * 4
+    calorias_proteinas = proteina_total * 4
     calorias_grasas = grasas_total * 9
     calorias_carbohidratos = calorias_diarias - (calorias_proteinas + calorias_grasas)
     carbohidratos_total = calorias_carbohidratos / 4
 
-    # Crear menú básico
-    menu = {
-        "desayuno": [alimentos["proteinas"][0], alimentos["carbohidratos"][0], alimentos["grasas"][0]],
-        "almuerzo": [alimentos["proteinas"][1], alimentos["carbohidratos"][1], alimentos["grasas"][1]],
-        "cena": [alimentos["proteinas"][2], alimentos["carbohidratos"][2], alimentos["grasas"][2]],
-    }
-    if comidas_por_dia == 4:
-        menu["merienda"] = [alimentos["proteinas"][3], alimentos["carbohidratos"][3], alimentos["grasas"][0]]
-    elif comidas_por_dia == 5:
-        menu["merienda"] = [alimentos["proteinas"][3], alimentos["carbohidratos"][3], alimentos["grasas"][0]]
-        menu["colación"] = [alimentos["proteinas"][4], alimentos["carbohidratos"][2], alimentos["grasas"][1]]
-
+    # Generar menú con porciones exactas
+    menu_personalizado = generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total)
+    
     return jsonify({
-        "calorias_diarias": calorias_diarias,
-        "macronutrientes": {
-            "proteina": proteinas_total,
-            "grasas": grasas_total,
-            "carbohidratos": carbohidratos_total
-        },
-        "menu": menu
+        "mensaje": "Menú generado exitosamente",
+        "menu": menu_personalizado,
+        "nota": "Todas las cantidades de alimentos están basadas en valores por cada 100 gramos."
     })
 
 if __name__ == "__main__":
-    serve(app, host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)
