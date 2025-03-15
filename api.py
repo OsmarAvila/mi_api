@@ -65,6 +65,12 @@ def generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total
     
     return menu
 
+# Ruta principal
+@app.route("/", methods=["GET"])
+def home():
+    return "¡El servidor está funcionando!"
+
+# Ruta para generar menú
 @app.route("/generar_menu", methods=["POST"])
 def generar_menu():
     datos = request.json
