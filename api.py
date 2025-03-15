@@ -36,6 +36,7 @@ factores_actividad = {
 }
 
 def calcular_porciones(macro_total, alimento, tipo):
+    """Calcula las porciones necesarias para cada alimento según el tipo (proteína, carbohidrato, grasa)."""
     if tipo == "proteina":
         return round((macro_total / alimento["proteina"]) * 100, 2)
     elif tipo == "carbohidrato":
@@ -45,34 +46,55 @@ def calcular_porciones(macro_total, alimento, tipo):
     return 100
 
 def generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total):
+    """Genera un menú balanceado distribuyendo los macronutrientes entre las comidas."""
     calorias_por_comida = calorias_diarias / comidas_por_dia
     menu = {}
-    
+
+    # Fuentes de proteínas, carbohidratos y grasas
+    fuentes_proteina = alimentos["proteinas"]
+    fuentes_carbohidratos = alimentos["carbohidratos"]
+    fuentes_grasas = alimentos["grasas"]
+
+    # Distribuir los macronutrientes entre las comidas
     for i in range(comidas_por_dia):
-        proteina = random.choice(alimentos["proteinas"])
-        carbohidrato = random.choice(alimentos["carbohidratos"])
-        grasa = random.choice(alimentos["grasas"])
-        
+        # Seleccionar un alimento de cada tipo (proteína, carbohidrato, grasa)
+        proteina = random.choice(fuentes_proteina)
+        carbohidrato = random.choice(fuentes_carbohidratos)
+        grasa = random.choice(fuentes_grasas)
+
+        # Calcular las porciones para cada tipo de alimento
         porcion_proteina = calcular_porciones(proteina_total / comidas_por_dia, proteina, "proteina")
         porcion_carbohidrato = calcular_porciones(carbohidratos_total / comidas_por_dia, carbohidrato, "carbohidrato")
         porcion_grasa = calcular_porciones(grasas_total / comidas_por_dia, grasa, "grasa")
-        
+
+        # Generar cada comida con la fuente de proteína, carbohidrato y grasa seleccionada
         menu[f"Comida {i+1}"] = {
-            "proteina": {"nombre": proteina["nombre"], "cantidad": f"{porcion_proteina}g"},
-            "carbohidrato": {"nombre": carbohidrato["nombre"], "cantidad": f"{porcion_carbohidrato}g"},
-            "grasa": {"nombre": grasa["nombre"], "cantidad": f"{porcion_grasa}g"},
+            "proteina": {
+                "nombre": proteina["nombre"],
+                "cantidad": f"{porcion_proteina}g"
+            },
+            "carbohidrato": {
+                "nombre": carbohidrato["nombre"],
+                "cantidad": f"{porcion_carbohidrato}g"
+            },
+            "grasa": {
+                "nombre": grasa["nombre"],
+                "cantidad": f"{porcion_grasa}g"
+            }
         }
-    
+
     return menu
 
 # Ruta principal
 @app.route("/", methods=["GET"])
 def home():
+    """Verificar que el servidor está funcionando."""
     return "¡El servidor está funcionando!"
 
-# Ruta para generar menú
+# Ruta para generar el menú personalizado
 @app.route("/generar_menu", methods=["POST"])
 def generar_menu():
+    """Recibe los datos del usuario y genera el menú personalizado."""
     datos = request.json
     try:
         peso = datos["peso"]
@@ -85,16 +107,16 @@ def generar_menu():
     except KeyError:
         return jsonify({"error": "Faltan datos necesarios"}), 400
 
-    # Calcular TMB
+    # Calcular TMB (Metabolismo Basal)
     if genero.lower() == "hombre":
         tmb = (10 * peso) + (6.25 * altura) - (5 * edad) + 5
     else:
         tmb = (10 * peso) + (6.25 * altura) - (5 * edad) - 161
 
-    # Calcular GET
+    # Calcular GET (Gasto Energético Total)
     get = tmb * factores_actividad.get(actividad, 1.55)
 
-    # Ajustar calorías según objetivo
+    # Ajustar calorías según el objetivo
     if objetivo == "perder grasa":
         calorias_diarias = get - 500
     elif objetivo == "ganar músculo":
@@ -102,17 +124,18 @@ def generar_menu():
     else:
         calorias_diarias = get
 
-    # Cálculo de macronutrientes
-    proteina_total = peso * 3  # 3g/kg
-    grasas_total = peso * 1  # 1g/kg
-    calorias_proteinas = proteina_total * 4
-    calorias_grasas = grasas_total * 9
-    calorias_carbohidratos = calorias_diarias - (calorias_proteinas + calorias_grasas)
-    carbohidratos_total = calorias_carbohidratos / 4
+    # Calcular macronutrientes
+    proteina_total = peso * 3  # 3g por kg de peso
+    grasas_total = peso * 1  # 1g por kg de peso
+    calorias_proteinas = proteina_total * 4  # Calorías por proteínas
+    calorias_grasas = grasas_total * 9  # Calorías por grasas
+    calorias_carbohidratos = calorias_diarias - (calorias_proteinas + calorias_grasas)  # Calorías restantes para carbohidratos
+    carbohidratos_total = calorias_carbohidratos / 4  # Convertir calorías en gramos de carbohidratos
 
-    # Generar menú con porciones exactas
+    # Generar menú con las porciones exactas
     menu_personalizado = generar_menu_personalizado(calorias_diarias, comidas_por_dia, proteina_total, carbohidratos_total, grasas_total)
-    
+
+    # Responder con el menú generado
     return jsonify({
         "mensaje": "Menú generado exitosamente",
         "menu": menu_personalizado,
